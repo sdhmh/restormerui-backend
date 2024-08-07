@@ -16,7 +16,9 @@ from model import clean, Model
 
 load_dotenv()
 
-app = FastAPI()
+openapi_path = "/openapi.json" if not os.getenv("ENVIRONMENT") == "PRODUCTION" else None
+
+app = FastAPI(openapi_url=openapi_path)
 
 engine = create_engine("sqlite://")
 
