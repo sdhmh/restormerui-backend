@@ -1,9 +1,7 @@
 from enum import Enum
-from typing import Optional
-from botocore.utils import S3EndpointSetter
-from pydantic.main import BaseModel
+from typing import Optional, Union
+from pathlib import Path
 from sqlmodel import Field, SQLModel
-from starlette.types import StatefulLifespan
 
 class TaskStatus(str, Enum):
     SCHEDULED = "scheduled"
@@ -14,5 +12,5 @@ class TaskStatus(str, Enum):
 class Task(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     status: TaskStatus
-    source: str
-    output: str
+    source: Union[Path, str]
+    output: Union[Path, str]

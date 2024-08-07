@@ -6,12 +6,10 @@ import uuid
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, status
 from fastapi.responses import Response
-from sqlalchemy import Select
-from sqlalchemy.orm.util import _DeStringifyAnnotation
 from sqlmodel import create_engine, SQLModel, Session, select
 from starlette.responses import JSONResponse
 
-from utils import Error, BadError, ErrorTypes, Success, Task, TaskStatus, upload, ResponseErrors
+from utils import Error, BadError, Success, Task, TaskStatus, upload, ResponseErrors
 from model import clean, Model
 
 load_dotenv()
