@@ -1,0 +1,6 @@
+.*
+*.pth
+pyrightconfig.json
+__pycache__/
+
+!.gitignore

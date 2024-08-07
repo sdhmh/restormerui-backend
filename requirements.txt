@@ -9,6 +9,7 @@ einops==0.6.1
 exceptiongroup==1.2.2
 fastapi==0.103.2
 flit_core
+greenlet==3.0.3
 h11==0.14.0
 httptools==0.6.0
 idna==3.7
@@ -37,6 +38,8 @@ scikit-image==0.19.3
 scipy==1.7.3
 six
 sniffio==1.3.1
+SQLAlchemy==2.0.32
+sqlmodel==0.0.21
 starlette==0.27.0
 tifffile==2021.11.2
 torch==1.8.1
