@@ -1,2 +1,2 @@
 from .models import *
-from . import clean
+from .clean import clean_image

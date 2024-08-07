@@ -10,7 +10,7 @@ from sqlmodel import create_engine, SQLModel, Session, select
 from starlette.responses import JSONResponse
 
 from utils import Error, BadError, Success, Task, TaskStatus, upload, ResponseErrors
-from model import clean, Model
+from model import clean_image as clean, Model
 
 load_dotenv()
 
@@ -38,7 +38,7 @@ def get_task(task_id) -> Optional[Task]:
     return task
 
 async def clean_image_concurrently(task_id: int, file: UploadFile, model: Model):
-    output_image = clean.clean_image(await file.read(), model.value)
+    output_image = clean(await file.read(), model.value)
     task = get_task(task_id)
     if task:
         upload(task, output_image)
