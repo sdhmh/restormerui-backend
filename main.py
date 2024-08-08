@@ -54,7 +54,6 @@ def task_get(task_id):
     task = get_task(task_id)
     return task
 def clean_image_concurrently(task_id: int, model: str) -> None:
-    print("I am here")
     update_task_status(task_id, TaskStatus.PROCESSING)
     task = get_task(task_id)
     if task:
@@ -67,7 +66,7 @@ def clean_image_concurrently(task_id: int, model: str) -> None:
             input_image = image.read()
         input_uploaded_to = upload(task.source, input_image)
         output_uploaded_to = upload(task.output, output_image)
-        print(input_uploaded_to)
+
         set_task_uploaded_to(task_id, input_uploaded_to)
         update_task_status(task_id, TaskStatus.FINISHED)
 
@@ -136,8 +135,6 @@ async def clean_image(file: UploadFile, model: Model, background_tasks: Backgrou
             upload_to_local(source, data)
 
             background_tasks.add_task(clean_image_concurrently, task_id, model.value)
-
-            print("this is executing now")
 
         return JSONResponse(Success(details="Pending", data={"taskId": task_id}).model_dump(), status.HTTP_202_ACCEPTED)
 

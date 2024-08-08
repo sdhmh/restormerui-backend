@@ -1,5 +1,6 @@
 .*
 *.pth
+*.pyc
 pyrightconfig.json
 __pycache__/
 state.json

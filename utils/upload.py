@@ -15,12 +15,9 @@ LOCAL_BUCKET = Path("static")
 
 def upload(filename: str, file_data: bytes):
     upload_possible, success = upload_to_s3(filename, file_data)
-    print(success, upload_possible)
     if not success:
-        print("here")
         upload_to_local(filename, file_data)
         return "local"
-    print("no i am here")
     return "s3"
 
 def upload_to_s3(filename: str, file: bytes) -> Tuple[Union[None, message.ResponseErrors, message.Error, message.Success], bool]:
