@@ -5,9 +5,8 @@ from typing import Tuple, Union
 from boto3 import client
 import botocore.exceptions
 
-
-
 from . import message
+
 s3 = client("s3")
 
 S3_BUCKET = os.getenv("S3_BUCKET")
