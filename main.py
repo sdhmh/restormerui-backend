@@ -1,14 +1,13 @@
-import json
 import os
-from pathlib import Path
 import uuid
+import secrets
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, UploadFile, status, BackgroundTasks
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
 from sqlmodel import SQLModel, Session
 from fastapi.responses import JSONResponse
 
@@ -19,6 +18,8 @@ from utils.db import get_task, set_task_uploaded_to, update_task_status, engine
 from utils.message import BadError, Error, ResponseErrors, Success
 from utils.sqlite_models import Task, TaskStatus
 from utils.upload import S3_BUCKET, upload, upload_to_local
+
+
 
 
 load_dotenv()
@@ -34,13 +35,20 @@ def init_db():
 
 def init_state():
     with open("state.json", "w") as jf:
-        state = {"task_id": "", "status": "finished"}
-        json.dump(state, jf)
+        state = AppState(status=TaskStatus.FINISHED, task_id=None)
+        jf.write(state.model_dump_json())
+
+def create_token():
+    return secrets.token_hex(16)
+
+TOKEN = create_token()
 
 @app.on_event("startup")
 def startup():
     init_db()
     init_state()
+    print(TOKEN)
+
 
 if os.getenv("RESTORMER_MAX_FILE_SIZE"):
     MAX_FILE_SIZE = int(os.environ["RESTORMER_MAX_FILE_SIZE"])
@@ -48,6 +56,7 @@ else:
     MAX_FILE_SIZE = 250 # in kbs
 
 ALLOWED_FILE_TYPES = ["jpeg", "jpg", "png"]
+
 
 @app.get('/task')
 def task_get(task_id):
@@ -75,10 +84,10 @@ def clean_image_concurrently(task_id: int, model: str) -> None:
 def read_root(response: Response):
     return Success(details="running")
 
-@app.get("/progress")
+@app.get("/progress", response_model=AppState)
 def get_progress():
     with open("state.json", "r") as jf:
-        state = json.load(jf)
+        state = AppState.model_validate_json(jf.read())
     return state
 @app.get("/link")
 def get_link(task_id):
@@ -97,8 +106,8 @@ def get_link(task_id):
 @app.post("/clean", status_code=status.HTTP_202_ACCEPTED, response_model=Success, responses={status.HTTP_400_BAD_REQUEST: {"model": BadError }, status.HTTP_406_NOT_ACCEPTABLE: {"model": Error}})
 async def clean_image(file: UploadFile, model: Model, background_tasks: BackgroundTasks, response: Response):
     with open('state.json', 'r') as jf:
-        state = json.load(jf)
-        if state.get("status") != "finished":
+        state = AppState.model_validate_json(jf.read())
+        if state.status != "finished":
             return JSONResponse(ResponseErrors.ALREADY_PROCESSING.value, status.HTTP_406_NOT_ACCEPTABLE)
 
     if file.size:
