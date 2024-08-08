@@ -10,8 +10,21 @@ from runpy import run_path
 from skimage import img_as_ubyte
 import cv2
 import numpy as np
-
+from .models import DEBLUR, DERAIN, DEFOCUS
 img_multiple_of = 8
+
+def clean(image: Path, model: str):
+    model_path = Path()
+    if model == "derain":
+        model_path = DERAIN
+    elif model == "deblur":
+        model_path = DEBLUR
+    elif model == "defocus":
+        model_path = DEFOCUS
+    model = load_model(model_path)
+    with open(image, 'rb') as image_file:
+        image_bytes = image_file.read()
+    return clean_image(image_bytes, model)
 
 def load_model(model_path: Path):
     #? Get model weights and parameters

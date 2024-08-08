@@ -2,5 +2,7 @@
 *.pth
 pyrightconfig.json
 __pycache__/
+state.json
+db.sqlite
 
 !.gitignore

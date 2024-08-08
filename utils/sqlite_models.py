@@ -1,9 +1,9 @@
 from enum import Enum
-from typing import Optional, Union
-from pathlib import Path
+from typing import Optional
 from sqlmodel import Field, SQLModel
 
 class TaskStatus(str, Enum):
+    PENDING = "pending"
     SCHEDULED = "scheduled"
     PROCESSING = "processing"
     UPLOADING = "uploading"
@@ -11,6 +11,6 @@ class TaskStatus(str, Enum):
 
 class Task(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    status: TaskStatus
-    source: Union[Path, str]
-    output: Union[Path, str]
+    source: str
+    output: str
+    uploaded_to: Optional[str] = None

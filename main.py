@@ -1,16 +1,25 @@
+import json
 import os
 from pathlib import Path
-from typing import Optional
 import uuid
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, status
-from fastapi.responses import Response
-from sqlmodel import create_engine, SQLModel, Session, select
-from starlette.responses import JSONResponse
 
-from utils import Error, BadError, Success, Task, TaskStatus, upload, ResponseErrors
-from model import clean_image as clean, Model
+from fastapi import FastAPI, UploadFile, status, BackgroundTasks
+from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
+from sqlmodel import SQLModel, Session
+from fastapi.responses import JSONResponse
+
+from model.clean import clean
+from model.models import Model
+
+from utils.db import get_task, set_task_uploaded_to, update_task_status, engine
+from utils.message import BadError, Error, ResponseErrors, Success
+from utils.sqlite_models import Task, TaskStatus
+from utils.upload import S3_BUCKET, upload, upload_to_local
+
 
 load_dotenv()
 
@@ -18,9 +27,20 @@ openapi_path = "/openapi.json" if not os.getenv("ENVIRONMENT") == "PRODUCTION" e
 
 app = FastAPI(openapi_url=openapi_path)
 
-engine = create_engine("sqlite://")
+app.mount('/static', StaticFiles(directory='static'), name="static")
 
-SQLModel.metadata.create_all(engine)
+def init_db():
+    SQLModel.metadata.create_all(engine)
+
+def init_state():
+    with open("state.json", "w") as jf:
+        state = {"task_id": "", "status": "finished"}
+        json.dump(state, jf)
+
+@app.on_event("startup")
+def startup():
+    init_db()
+    init_state()
 
 if os.getenv("RESTORMER_MAX_FILE_SIZE"):
     MAX_FILE_SIZE = int(os.environ["RESTORMER_MAX_FILE_SIZE"])
@@ -29,27 +49,59 @@ else:
 
 ALLOWED_FILE_TYPES = ["jpeg", "jpg", "png"]
 
-
-def get_task(task_id) -> Optional[Task]:
-    with Session(engine) as session:
-        query = select(Task).where(Task.id == task_id)
-        task_out = session.exec(query)
-        task = task_out.first()
+@app.get('/task')
+def task_get(task_id):
+    task = get_task(task_id)
     return task
-
-async def clean_image_concurrently(task_id: int, file: UploadFile, model: Model):
-    output_image = clean(await file.read(), model.value)
+def clean_image_concurrently(task_id: int, model: str) -> None:
+    print("I am here")
+    update_task_status(task_id, TaskStatus.PROCESSING)
     task = get_task(task_id)
     if task:
-        upload(task, output_image)
+        input_ = Path("static") / task.source
+
+        output_image = clean(input_, model).read()
+
+        update_task_status(task_id, TaskStatus.UPLOADING)
+        with open(input_, 'rb') as image:
+            input_image = image.read()
+        input_uploaded_to = upload(task.source, input_image)
+        output_uploaded_to = upload(task.output, output_image)
+        print(input_uploaded_to)
+        set_task_uploaded_to(task_id, input_uploaded_to)
+        update_task_status(task_id, TaskStatus.FINISHED)
+
 
 @app.get("/", response_model=Success)
 def read_root(response: Response):
     return Success(details="running")
 
+@app.get("/progress")
+def get_progress():
+    with open("state.json", "r") as jf:
+        state = json.load(jf)
+    return state
+@app.get("/link")
+def get_link(task_id):
+    task = get_task(task_id)
+    link = {"source_link": "", "output_link": ""} # to avoid None
+    if task:
+        if task.uploaded_to == "s3":
+            link["source_link"] = f"https://{S3_BUCKET}.s3.amazonaws.com/{task.source}"
+            link["output_link"] = f"https://{S3_BUCKET}.s3.amazonaws.com/{task.output}"
+        elif task.uploaded_to == "local":
+            link["source_link"] = f"/static/{task.source}"
+            link["output_link"] = f"/static/{task.output}"
+
+    return link
 
 @app.post("/clean", status_code=status.HTTP_202_ACCEPTED, response_model=Success, responses={status.HTTP_400_BAD_REQUEST: {"model": BadError }, status.HTTP_406_NOT_ACCEPTABLE: {"model": Error}})
-async def clean_image(file: UploadFile, model: Model, response: Response):
+async def clean_image(file: UploadFile, model: Model, background_tasks: BackgroundTasks, response: Response):
+    with open('state.json', 'r') as jf:
+        state = json.load(jf)
+        if state.get("status") != "finished":
+            return JSONResponse(ResponseErrors.ALREADY_PROCESSING.value, status.HTTP_406_NOT_ACCEPTABLE)
+
     if file.size:
         if file.size > MAX_FILE_SIZE * 1024:
             return JSONResponse(ResponseErrors.BIG_FILE_SIZE.value, status.HTTP_406_NOT_ACCEPTABLE)
@@ -70,24 +122,23 @@ async def clean_image(file: UploadFile, model: Model, response: Response):
         source = f"{filename}.{ext}"
         destination = f"{filename}_processed.{ext}"
 
-        task = Task(source=source, output=destination, status=TaskStatus.SCHEDULED)
+        task = Task(source=source, output=destination)
 
         with Session(engine) as session:
             session.add(task)
             session.commit()
+            session.refresh(task)
+            task_id = task.id
 
-        return JSONResponse(Success(details="Task Scheduled"), status.HTTP_202_ACCEPTED)
-        # task.local_output = "This is test"
-        # with Session(engine) as ses:
-        #     query = select(sqlite_models.Task)
-        #     test = ses.exec(query)
-        #     print("test", test.fetchall())
-        #     ses.add(task)
-        #     ses.commit()
-        #     query = select(sqlite_models.Task)
-        #     test = ses.exec(query)
-        #     print("test", test.fetchall())
+        if task_id:
+            update_task_status(task_id, TaskStatus.PENDING)
+            data = await file.read()
+            upload_to_local(source, data)
 
-        # print(task.model_dump())
+            background_tasks.add_task(clean_image_concurrently, task_id, model.value)
+
+            print("this is executing now")
+
+        return JSONResponse(Success(details="Pending", data={"taskId": task_id}).model_dump(), status.HTTP_202_ACCEPTED)
 
     return JSONResponse(ResponseErrors.INVALID_CONTENT.value, status.HTTP_400_BAD_REQUEST)

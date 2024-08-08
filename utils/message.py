@@ -6,6 +6,7 @@ class ErrorTypes(str, Enum):
     BIG_FILE_SIZE = "BIG_FILE_SIZE"
     UPLOAD_TO_S3_NOT_SUCCESSFUL = "UPLOAD_TO_S3_NOT_SUCCESSFUL"
     S3_ERROR = "S3_ERROR"
+    ALREADY_PROCESSING = "ALREADY_PROCESSING"
 
 class BadErrorTypes(str, Enum):
     INVALID_CONTENT = "INVALID_CONTENT"
@@ -32,6 +33,7 @@ class BadError(Message):
     details: Optional[str] = "A Bad Error Occured!"
 
 class ResponseErrors(dict, Enum):
+    ALREADY_PROCESSING = Error(reason=ErrorTypes.ALREADY_PROCESSING).model_dump()
     BIG_FILE_SIZE = Error(reason=ErrorTypes.BIG_FILE_SIZE).model_dump()
     UPLOAD_TO_S3_NOT_SUCCESSFUL = Error(reason=ErrorTypes.UPLOAD_TO_S3_NOT_SUCCESSFUL).model_dump()
     S3_ERROR = Error(reason=ErrorTypes.S3_ERROR).model_dump()
