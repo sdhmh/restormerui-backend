@@ -1,28 +1,32 @@
 import os
+from typing_extensions import Annotated
 import uuid
 import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, UploadFile, status, BackgroundTasks
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, status, BackgroundTasks
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from sqlmodel import SQLModel, Session
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlmodel import SQLModel, Session
+
 
 from model.clean import clean
 from model.models import Model
 
+from utils.auth import Token, User, UserInRuntime, authenticate_user, create_access_token, decode_access_token
+from utils.core import AppState
 from utils.db import get_task, set_task_uploaded_to, update_task_status, engine
 from utils.message import BadError, Error, ResponseErrors, Success
 from utils.sqlite_models import Task, TaskStatus
 from utils.upload import S3_BUCKET, upload, upload_to_local
 
 
-
-
 load_dotenv()
+
 
 openapi_path = "/openapi.json" if not os.getenv("ENVIRONMENT") == "PRODUCTION" else None
 
@@ -30,6 +34,8 @@ app = FastAPI(openapi_url=openapi_path)
 
 app.mount('/static', StaticFiles(directory='static'), name="static")
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# Init functions
 def init_db():
     SQLModel.metadata.create_all(engine)
 
@@ -38,16 +44,16 @@ def init_state():
         state = AppState(status=TaskStatus.FINISHED, task_id=None)
         jf.write(state.model_dump_json())
 
-def create_token():
-    return secrets.token_hex(16)
+def create_token(size):
+    return secrets.token_hex(size)
 
-TOKEN = create_token()
+temp_user = UserInRuntime(username=create_token(8), password=create_token(32))
 
 @app.on_event("startup")
 def startup():
     init_db()
     init_state()
-    print(TOKEN)
+    print(f"Use this token to login: {temp_user}")
 
 
 if os.getenv("RESTORMER_MAX_FILE_SIZE"):
@@ -57,11 +63,6 @@ else:
 
 ALLOWED_FILE_TYPES = ["jpeg", "jpg", "png"]
 
-
-@app.get('/task')
-def task_get(task_id):
-    task = get_task(task_id)
-    return task
 def clean_image_concurrently(task_id: int, model: str) -> None:
     update_task_status(task_id, TaskStatus.PROCESSING)
     task = get_task(task_id)
@@ -79,18 +80,32 @@ def clean_image_concurrently(task_id: int, model: str) -> None:
         set_task_uploaded_to(task_id, input_uploaded_to)
         update_task_status(task_id, TaskStatus.FINISHED)
 
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    credentials_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Couldn't validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    user = decode_access_token(token)
+    if not user:
+        raise credentials_exception
+    return user
 
-@app.get("/", response_model=Success)
-def read_root(response: Response):
+@app.get("/health", response_model=Success)
+def check_health(response: Response):
     return Success(details="running")
 
+@app.post("/token", response_model=Token)
+def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    user = authenticate_user(temp_user, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Username or Password", headers={"WWW-Authenticate": "Bearer"})
+    access_token = create_access_token(user.username)
+    return Token(access_token=access_token, token_type="bearer")
+
 @app.get("/progress", response_model=AppState)
-def get_progress():
+def get_progress(current_user: Annotated[User, Depends(get_current_user)]):
     with open("state.json", "r") as jf:
         state = AppState.model_validate_json(jf.read())
     return state
 @app.get("/link")
-def get_link(task_id):
+def get_link(task_id: int, current_user: Annotated[User, Depends(get_current_user)]):
     task = get_task(task_id)
     link = {"source_link": "", "output_link": ""} # to avoid None
     if task:
@@ -104,7 +119,7 @@ def get_link(task_id):
     return link
 
 @app.post("/clean", status_code=status.HTTP_202_ACCEPTED, response_model=Success, responses={status.HTTP_400_BAD_REQUEST: {"model": BadError }, status.HTTP_406_NOT_ACCEPTABLE: {"model": Error}})
-async def clean_image(file: UploadFile, model: Model, background_tasks: BackgroundTasks, response: Response):
+async def clean_image(file: UploadFile, model: Model, background_tasks: BackgroundTasks, response: Response, current_user: Annotated[User, Depends(get_current_user)]):
     with open('state.json', 'r') as jf:
         state = AppState.model_validate_json(jf.read())
         if state.status != "finished":
