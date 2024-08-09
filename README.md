@@ -21,10 +21,10 @@ Then run the backend using:
 ```bash
 docker run -dp 8000:8000 \
     -v ./db.sqlite:/app/db.sqlite \
-    -e SECRET=$(openssl rand -hex 32)
-    -e S3_BUCKET="your bucket" # this is optional
-    -e ENVIRONMENT="PRODUCTION" # leave blank to see the api docs
-    --name=restormerui-backend
+    -e SECRET=$(openssl rand -hex 32) \
+    -e S3_BUCKET="your bucket" \ # this is optional
+    -e ENVIRONMENT="PRODUCTION" \ # leave blank to see the api docs
+    --name=restormerui-backend \
     restormerui-backend:latest
 ```
 
