@@ -23,7 +23,7 @@ docker run -dp 8000:8000 \
     -v ./db.sqlite:/app/db.sqlite \
     -e SECRET=$(openssl rand -hex 32)
     -e S3_BUCKET="your bucket" # this is optional
-    -e ENVIRONMENT="PRODUCTION"
+    -e ENVIRONMENT="PRODUCTION" # leave blank to see the api docs
     --name=restormerui-backend
     restormerui-backend:latest
 ```
@@ -58,6 +58,14 @@ pip install -r requirements.txt
 ```
 
 **4. Run your application**
+
+Copy sample.env to your .env
+
+```
+cp sample.env .env
+```
+
+Make sure to make the necessary changes in the .env file before proceeding
 
 In the root directory of this project run this:
 
