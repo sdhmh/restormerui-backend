@@ -34,7 +34,7 @@ To get the `username` and `password`, run this command:
 ```bash
 docker logs restormerui-backend | grep token
 ````
-## Miniconda
+### Miniconda
 
 > Installing using Miniconda is a bit difficult and not recommended unless you plan to develop the app further
 
