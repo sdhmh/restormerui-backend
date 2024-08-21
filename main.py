@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middlewares.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session
 
 
@@ -25,8 +26,7 @@ from utils.sqlite_models import Task, TaskStatus
 from utils.upload import S3_BUCKET, upload, upload_to_local
 
 
-load_dotenv()
-
+origin_regex = os.getenv("CORS_ORIGIN", "http://localhost:3000")
 
 openapi_path = "/openapi.json" if not os.getenv("ENVIRONMENT") == "PRODUCTION" else None
 
@@ -55,11 +55,7 @@ def startup():
     init_state()
     print(f"Use this token to login: {temp_user}")
 
-
-if os.getenv("RESTORMER_MAX_FILE_SIZE"):
-    MAX_FILE_SIZE = int(os.environ["RESTORMER_MAX_FILE_SIZE"])
-else:
-    MAX_FILE_SIZE = 250 # in kbs
+MAX_FILE_SIZE = os.getenv("RESTORMER_MAX_FILE_SIZE", 250)
 
 ALLOWED_FILE_TYPES = ["jpeg", "jpg", "png"]
 
