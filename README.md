@@ -1,3 +1,5 @@
+[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fsdhmh%2Frestormerui-backend&count_bg=%231C4000&title_bg=%233B5B62&icon=&icon_color=%23E7E7E7&title=Total+Visitors&edge_flat=false)](https://hits.seeyoufarm.com)
+
 ## Installation
 
 Requirements:
@@ -21,10 +23,10 @@ Then run the backend using:
 ```bash
 docker run -dp 8000:8000 \
     -v ./db.sqlite:/app/db.sqlite \
-    -e SECRET=$(openssl rand -hex 32)
-    -e S3_BUCKET="your bucket" # this is optional
-    -e ENVIRONMENT="PRODUCTION" # leave blank to see the api docs
-    --name=restormerui-backend
+    -e SECRET=$(openssl rand -hex 32) \
+    -e S3_BUCKET="your bucket" \ # this is optional
+    -e ENVIRONMENT="PRODUCTION" \ # leave blank to see the api docs
+    --name=restormerui-backend \
     restormerui-backend:latest
 ```
 
@@ -34,7 +36,7 @@ To get the `username` and `password`, run this command:
 ```bash
 docker logs restormerui-backend | grep token
 ````
-## Miniconda
+### Miniconda
 
 > Installing using Miniconda is a bit difficult and not recommended unless you plan to develop the app further
 
