@@ -26,13 +26,13 @@ from utils.sqlite_models import Task, TaskStatus
 from utils.upload import S3_BUCKET, upload, upload_to_local
 
 
-origin_regex = os.getenv("CORS_ORIGIN", "http://localhost:3000")
+origin = os.getenv("CORS_ORIGIN", "http://localhost:3000")
 
 openapi_path = "/openapi.json" if not os.getenv("ENVIRONMENT") == "PRODUCTION" else None
 
 app = FastAPI(openapi_url=openapi_path)
 
-app.add_middleware(CORSMiddleware, allow_origin_regex=origin_regex, allow_credentials=True, allow_headers=["*"], allow_methods=["GET", "POST"])
+app.add_middleware(CORSMiddleware, allow_origins=[origin], allow_credentials=True, allow_headers=["*"], allow_methods=["GET", "POST"])
 
 app.mount('/static', StaticFiles(directory='static'), name="static")
 
